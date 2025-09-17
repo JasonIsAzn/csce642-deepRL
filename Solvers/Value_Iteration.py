@@ -1,10 +1,3 @@
-# Licensing Information:  You are free to use or extend this codebase for
-# educational purposes provided that (1) you do not distribute or publish
-# solutions, (2) you retain this notice, and (3) inform Guni Sharon at 
-# guni@tamu.edu regarding your usage (relevant statistics is reported to NSF).
-# The development of this assignment was supported by NSF (IIS-2238979).
-# Contributors:
-# The core code base was developed by Guni Sharon (guni@tamu.edu).
 
 import numpy as np
 import heapq
@@ -23,58 +16,14 @@ class ValueIteration(AbstractSolver):
         self.V = np.zeros(env.observation_space.n)
 
     def train_episode(self):
-        """
-        Inputs: (Available/Useful variables)
-            self.env
-                this the OpenAI GYM environment
-                     see https://gymnasium.farama.org/index.html
-
-            state, _ = self.env.reset():
-                Resets the environment and returns the starting state
-
-            self.env.observation_space.n:
-                number of states in the environment
-
-            self.env.action_space.n:
-                number of actions in the environment
-
-            for probability, next_state, reward, done in self.env.P[state][action]:
-                `probability` will be probability of `next_state` actually being the next state
-                `reward` is the short-term/immediate reward for achieving that next state
-                `done` is a boolean of whether or not that next state is the last/terminal state
-
-                Every action has a chance (at least theoretically) of different outcomes (states)
-                This is why `self.env.P[state][action]` is a list of outcomes and not a single outcome
-
-            self.options.gamma:
-                The discount factor (gamma from the slides)
-
-        Outputs: (what you need to update)
-            self.V:
-                This is a numpy array, but you can think of it as a dictionary
-                `self.V[state]` should return a floating point value that
-                represents the value of a state. This value should become
-                more accurate with each episode.
-
-                How should this be calculated?
-                    look at the value iteration algorithm
-                    Ref: Sutton book eq. 4.10.
-                Once those values have been updated, that's it for this function/class
-        """
-
-        # you can add variables here if it is helpful
-
-        # Update the estimated value of each state
+        V = self.V.copy()
         for each_state in range(self.env.observation_space.n):
-            # Do a one-step lookahead to find the best action
-            # Update the value function. Ref: Sutton book eq. 4.10.
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            ################################
-            pass
+            A = self.one_step_lookahead(each_state)
+            v_s = A.max()
+            V[each_state] = v_s
             
-
-        # Dont worry about this part
+        self.V = V
+            
         self.statistics[Statistics.Rewards.value] = np.sum(self.V)
         self.statistics[Statistics.Steps.value] = -1
 
@@ -82,14 +31,6 @@ class ValueIteration(AbstractSolver):
         return "Value Iteration"
 
     def one_step_lookahead(self, state: int):
-        """
-        Helper function to calculate the value for all actions from a given state.
-        Args:
-            state: The state to consider (int)
-            V: The value to use as an estimator, Vector of length self.env.observation_space.n
-        Returns:
-            A vector of length self.env.action_space.n containing the expected value of each action.
-        """
         A = np.zeros(self.env.action_space.n)
         for a in range(self.env.action_space.n):
             for prob, next_state, reward, done in self.env.P[state][a]:
@@ -97,53 +38,11 @@ class ValueIteration(AbstractSolver):
         return A
 
     def create_greedy_policy(self):
-        """
-        Creates a greedy policy based on state values.
-        Use:
-            self.env.action_space.n: Number of actions in the environment.
-        Returns:
-            A function that takes an observation as input and returns a Greedy
-               action
-        """
-
         def policy_fn(state):
-            """
-            What is this function?
-                This function is the part that decides what action to take
-
-            Inputs: (Available/Useful variables)
-                self.V[state]
-                    the estimated long-term value of getting to a state
-
-                values = self.one_step_lookahead(state)
-                    len(values) will be the number of actions (self.env.nA)
-                    values[action] will be the expected value of that action (float)
-
-                for probability, next_state, reward, done in self.env.P[state][action]:
-                    `probability` will be the probability of `next_state` actually being the next state
-                    `reward` is the short-term/immediate reward for achieving that next state
-                    `done` is a boolean of whether or not that next state is the last/terminal state
-
-                    Every action has a chance (at least theoretically) of different outcomes (states)
-                    This is why `self.env.P[state][action]` is a list of outcomes and not a single outcome
-
-                self.self.env.observation_space.n:
-                    number of states in the environment
-
-                self.self.env.action_space.n:
-                    number of actions in the environment
-
-                self.options.gamma:
-                    The discount factor (gamma from the slides)
-
-            Outputs: (what you need to output)
-                return action as an integer
-            """
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            ################################
-            
-
+            A = self.one_step_lookahead(state)
+            pi_s = np.argmax(A)
+            return pi_s
+        
         return policy_fn
 
 
@@ -194,8 +93,23 @@ class AsynchVI(ValueIteration):
         # Do a one-step lookahead to find the best action       #
         # Update the value function. Ref: Sutton book eq. 4.10. #
         #########################################################
+            
+        for _ in range(self.env.observation_space.n):
+            if self.pq.isEmpty():
+                break
+            
+            s = self.pq.pop()   
+            
+            A = self.one_step_lookahead(s)
+            v_s = A.max()
+            self.V[s] = v_s
+            
+            # Update priorities
+            for p in self.pred[s]:
+                A_p = self.one_step_lookahead(p)
+                v_p = A_p.max()
+                self.pq.update(p, -abs(self.V[p] - v_p))
 
-        # you can ignore this part
         self.statistics[Statistics.Rewards.value] = np.sum(self.V)
         self.statistics[Statistics.Steps.value] = -1
 

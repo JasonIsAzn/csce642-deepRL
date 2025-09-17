@@ -86,18 +86,7 @@ class AsynchVI(ValueIteration):
             self.V
                 this is still the same as the previous
         """
-
-        #########################################################
-        # YOUR IMPLEMENTATION HERE                              #
-        # Choose state with the maximal value change potential  #
-        # Do a one-step lookahead to find the best action       #
-        # Update the value function. Ref: Sutton book eq. 4.10. #
-        #########################################################
-            
-        for _ in range(self.env.observation_space.n):
-            if self.pq.isEmpty():
-                break
-            
+        for _ in range(self.env.observation_space.n):            
             s = self.pq.pop()   
             
             A = self.one_step_lookahead(s)

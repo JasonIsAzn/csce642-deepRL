@@ -90,13 +90,16 @@ class PolicyIteration(AbstractSolver):
         # A = (I - y * P_pi)
         # B = R_pi
         # x = V_pi
+        
+        s_size = self.env.observation_space.n
+        a_size = self.env.action_space.n
 
         # Compute P_pi and R_pi
-        P_pi = np.zeros((self.env.observation_space.n, self.env.observation_space.n))
-        R_pi = np.zeros(self.env.observation_space.n)
+        P_pi = np.zeros((s_size, s_size))
+        R_pi = np.zeros(s_size)
         
-        for s in range(self.env.observation_space.n):
-            for a in range(self.env.action_space.n):
+        for s in range(s_size):
+            for a in range(a_size):
                 policy_sa = self.policy[s,a]
                 if policy_sa == 0:
                     continue
@@ -104,16 +107,14 @@ class PolicyIteration(AbstractSolver):
                 for prob, next_state, reward, done in self.env.P[s][a]:
                     R_pi[s] += policy_sa * prob * reward
                     
-                    if not done:
-                        P_pi[s,next_state] += policy_sa * prob
+                    P_pi[s,next_state] += policy_sa * prob
         
         # Solve (I - y * P_pi) V = R_pi
-        A = np.eye(self.env.observation_space.n) - self.options.gamma * P_pi
+        A = np.eye(s_size) - self.options.gamma * P_pi
         
         # Solve Ax = B
         self.V = np.linalg.solve(A, R_pi)
-            
-        
+
 
     def create_greedy_policy(self):
         """

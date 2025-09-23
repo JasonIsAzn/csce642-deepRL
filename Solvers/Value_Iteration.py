@@ -82,19 +82,18 @@ class AsynchVI(ValueIteration):
         Update:
             self.V
                 this is still the same as the previous
-        """
-        for _ in range(self.env.observation_space.n):            
-            s = self.pq.pop()   
-            
-            A = self.one_step_lookahead(s)
-            v_s = A.max()
-            self.V[s] = v_s
-            
-            # Update priorities
-            for p in self.pred[s]:
-                A_p = self.one_step_lookahead(p)
-                v_p = A_p.max()
-                self.pq.update(p, -abs(self.V[p] - v_p))
+        """           
+        s = self.pq.pop()   
+        
+        A = self.one_step_lookahead(s)
+        v_s = A.max()
+        self.V[s] = v_s
+        
+        # Update priorities
+        for p in self.pred[s]:
+            A_p = self.one_step_lookahead(p)
+            v_p = A_p.max()
+            self.pq.update(p, -abs(self.V[p] - v_p))
 
         self.statistics[Statistics.Rewards.value] = np.sum(self.V)
         self.statistics[Statistics.Steps.value] = -1

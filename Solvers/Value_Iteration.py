@@ -16,13 +16,10 @@ class ValueIteration(AbstractSolver):
         self.V = np.zeros(env.observation_space.n)
 
     def train_episode(self):
-        V = self.V.copy()
         for each_state in range(self.env.observation_space.n):
             A = self.one_step_lookahead(each_state)
             v_s = A.max()
-            V[each_state] = v_s
-            
-        self.V = V
+            self.V[each_state] = v_s
             
         self.statistics[Statistics.Rewards.value] = np.sum(self.V)
         self.statistics[Statistics.Steps.value] = -1

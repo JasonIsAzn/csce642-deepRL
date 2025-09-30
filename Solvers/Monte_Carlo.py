@@ -37,78 +37,53 @@ class MonteCarlo(AbstractSolver):
         self.returns_count = defaultdict(float)
 
     def train_episode(self):
-        """
-        Run a single episode for (first visit) Monte Carlo Control using Epsilon-Greedy policies.
-
-        Use:
-            self.options.env: OpenAI gym environment.
-            self.options.steps: steps per episode
-            probs = self.policy(state): soft policy for a given state
-            np.random.choice(np.arange(len(probs)), p=probs): random index
-                from the given distribution 'probs'
-            self.options.gamma: Gamma discount factor.
-            next_state, reward, done, _ = self.step(action): advance one step in the environment
-
-        Note:
-            train_episode is called multiple times from run.py. Within
-            train_episode you need to store the transitions in 1 complete
-            trajectory/episode. Then using the transitions in that episode,
-            update the Q-function. Set Q-values as the (simple) average return for 
-            visited states over all sampled episodes
-        """
-
-        # Generate an episode.
-        # An episode is an array of (state, action, reward) tuples
         episode = []
         state, _ = self.env.reset()
         discount_factor = self.options.gamma
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        
+        for _ in range(self.options.steps):
+            probs = self.policy(state)
+            action = np.random.choice(np.arange(len(probs)), p=probs)
+            next_state, reward, done, _ = self.step(action)
+            episode.append((state, action, reward))
+            state = next_state
+            if done:
+                break
+
+        G = 0.0
+        visited = set()
+        for t in reversed(range(len(episode))):
+            s, a, r = episode[t]
+            G = r + discount_factor * G
+            if (s, a) not in visited:
+                visited.add((s, a))
+                self.returns_sum[(s, a)] += G
+                self.returns_count[(s, a)] += 1.0
+                self.Q[s][a] = self.returns_sum[(s, a)] / self.returns_count[(s, a)]
+
+        total_reward = 0
+        for (_, _, r, _) in episode:
+            total_reward += r
+
+        return total_reward, len(episode)
 
     def __str__(self):
         return "Monte Carlo"
 
     def make_epsilon_greedy_policy(self):
-        """
-        Creates an epsilon-greedy policy based on a given Q-estimates and epsilon.
-
-        Use:
-            self.Q: A dictionary that maps from state -> action-values.
-                Each value is a numpy array of length nA
-            self.options.epsilon: Chance the sample a random action. Float betwen 0 and 1.
-            self.env.action_space.n: Number of actions in the environment.
-
-        Returns:
-            A function that takes the observation as an argument and returns
-            the probabilities for each action in the form of a numpy array of length nA.
-
-        """
         nA = self.env.action_space.n
 
         def policy_fn(observation):
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            ################################
+            A = np.ones(nA, dtype=float) * (self.options.epsilon / nA)
+            best_action = np.argmax(self.Q[observation])
+            A[best_action] += 1.0 - self.options.epsilon
+            return A
 
         return policy_fn
 
     def create_greedy_policy(self):
-        """
-        Creates a greedy (soft) policy based on Q values.
-
-        Returns:
-            A function that takes an observation as input and returns a greedy
-            action
-
-        Use:
-            np.argmax(self.Q[state]): action with highest q value
-        """
-
         def policy_fn(state):
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            ################################
+            return int(np.argmax(self.Q[state]))
 
 
         return policy_fn
@@ -142,27 +117,34 @@ class OffPolicyMC(MonteCarlo):
         self.behavior_policy = self.create_random_policy()
 
     def train_episode(self):
-        """
-        Run a single episode of Monte Carlo Control Off-Policy Control using Weighted Importance Sampling.
-
-        Use:
-            elf.env: OpenAI environment.
-            self.options.steps: steps per episode
-            self.behavior_policy(state): returns a soft policy which is the
-                behavior policy (act according to this policy)
-            episode.append((state, action, reward)): memorize a transition
-            self.options.gamma: Gamma discount factor.
-            new_state, reward, done, _ = self.step(action): To advance one step in the environment
-            self.C[state][action]: weighted importance sampling formula denominator
-            self.Q[state][action]: q value for ('state', 'action')
-        """
         episode = []
         # Reset the environment
         state, _ = self.env.reset()
 
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        for _ in range(self.options.steps):
+            b_probs = self.behavior_policy(state)
+            action = np.random.choice(np.arange(len(b_probs)), p=b_probs)
+            next_state, reward, done, _ = self.step(action)
+            
+            episode.append((state, action, reward, b_probs[action]))
+            state = next_state
+            if done:
+                break
+
+        G = 0.0
+        W = 1.0
+        gamma = self.options.gamma
+        for t in reversed(range(len(episode))):
+            s, a, r, b_prob = episode[t]
+            G = gamma * G + r
+            self.C[s][a] += W
+            self.Q[s][a] += (W / (self.C[s][a])) * (G - self.Q[s][a])
+
+            if a != self.target_policy(s):
+                break
+            W = W / b_prob
+
+        return sum(r for _, _, r, _ in episode), len(episode)
         
 
     def create_random_policy(self):

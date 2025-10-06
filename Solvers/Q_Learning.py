@@ -51,9 +51,26 @@ class QLearning(AbstractSolver):
         # Reset the environment
         state, _ = self.env.reset()
 
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        total_reward = 0.0
+        steps = 0
+
+        for _ in range(self.options.steps):
+            action = self.epsilon_greedy_action(state)
+            next_state, reward, done, _ = self.step(action)
+
+            best_next = np.argmax(self.Q[next_state])
+            td_target = reward + (0.0 if done else self.options.gamma * self.Q[next_state][best_next])
+
+            self.Q[state][action] += self.options.alpha * (td_target - self.Q[state][action])
+
+            total_reward += reward
+            steps += 1
+            state = next_state
+            if done:
+                break
+
+        return total_reward, steps
+
 
     def __str__(self):
         return "Q-Learning"
@@ -72,11 +89,7 @@ class QLearning(AbstractSolver):
         """
 
         def policy_fn(state):
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            ################################
-            return -1
-
+            return int(np.argmax(self.Q[state]))
         return policy_fn
 
     def epsilon_greedy_action(self, state):
@@ -90,9 +103,9 @@ class QLearning(AbstractSolver):
         Returns:
             Probability of taking actions as a vector where each entry is the probability of taking that action
         """
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        if np.random.rand() < self.options.epsilon:
+            return self.env.action_space.sample()
+        return int(np.argmax(self.Q[state]))
 
 
 class ApproxQLearning(QLearning):
@@ -119,9 +132,25 @@ class ApproxQLearning(QLearning):
         # Reset the environment
         state, _ = self.env.reset()
 
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        total_reward = 0.0
+        steps = 0
+
+        for _ in range(self.options.steps):
+            action = self.epsilon_greedy(state)
+            next_state, reward, done, _ = self.step(action)
+
+            q_next = self.estimator.predict(next_state) 
+            td_target = reward + (0.0 if done else self.options.gamma * np.max(q_next))
+
+            self.estimator.update(state, action, td_target)
+
+            total_reward += reward
+            steps += 1
+            state = next_state
+            if done:
+                break
+
+        return total_reward, steps
 
     def __str__(self):
         return "Approx Q-Learning"
@@ -137,9 +166,11 @@ class ApproxQLearning(QLearning):
         Returns:
             Probability of taking actions as a vector where each entry is the probability of taking that action
         """
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        if np.random.rand() < self.options.epsilon:
+            return self.env.action_space.sample()
+        q_vals = self.estimator.predict(state) 
+        return int(np.argmax(q_vals))
+
 
     def create_greedy_policy(self):
         """
@@ -152,11 +183,9 @@ class ApproxQLearning(QLearning):
         nA = self.env.action_space.n
 
         def policy_fn(state):
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            ################################
-            return -1
-            
+            q_values = self.estimator.predict(state)
+            best_action = int(np.argmax(q_values))
+            return best_action
 
         return policy_fn
 

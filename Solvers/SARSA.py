@@ -44,9 +44,29 @@ class Sarsa(AbstractSolver):
 
         # Reset the environment
         state, _ = self.env.reset()
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        total_reward = 0.0
+        steps = 0
+
+        probs = self.epsilon_greedy_action(state)
+        action = int(np.random.choice(np.arange(self.env.action_space.n), p=probs))
+
+        for _ in range(self.options.steps):
+            next_state, reward, done, _ = self.step(action)
+
+            next_probs = self.epsilon_greedy_action(next_state)
+            next_action = int(np.random.choice(np.arange(self.env.action_space.n), p=next_probs))
+
+            td_target = reward + (0.0 if done else self.options.gamma * self.Q[next_state][next_action])
+            self.Q[state][action] += self.options.alpha * (td_target - self.Q[state][action])
+
+            total_reward += reward
+            steps += 1
+            state, action = next_state, next_action
+
+            if done:
+                break
+
+        return total_reward, steps
 
     def __str__(self):
         return "Sarsa"
@@ -60,10 +80,7 @@ class Sarsa(AbstractSolver):
         """
 
         def policy_fn(state):
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            ################################
-
+            return int(np.argmax(self.Q[state]))
         return policy_fn
 
     def epsilon_greedy_action(self, state):
@@ -77,9 +94,11 @@ class Sarsa(AbstractSolver):
         Returns:
             Probability of taking actions as a vector where each entry is the probability of taking that action
         """
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        nA = self.env.action_space.n
+        probs = np.ones(nA, dtype=float) * (self.options.epsilon / nA)
+        best_action = int(np.argmax(self.Q[state]))
+        probs[best_action] += 1.0 - self.options.epsilon
+        return probs
 
     def plot(self, stats, smoothing_window=20, final=False):
         plotting.plot_episode_stats(stats, smoothing_window, final=final)

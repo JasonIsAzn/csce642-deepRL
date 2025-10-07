@@ -59,9 +59,9 @@ class QLearning(AbstractSolver):
             next_state, reward, done, _ = self.step(action)
 
             best_next = np.argmax(self.Q[next_state])
-            td_target = reward + (0.0 if done else self.options.gamma * self.Q[next_state][best_next])
+            target = reward + (0.0 if done else self.options.gamma * self.Q[next_state][best_next])
 
-            self.Q[state][action] += self.options.alpha * (td_target - self.Q[state][action])
+            self.Q[state][action] += self.options.alpha * (target - self.Q[state][action])
 
             total_reward += reward
             steps += 1
@@ -140,9 +140,9 @@ class ApproxQLearning(QLearning):
             next_state, reward, done, _ = self.step(action)
 
             q_next = self.estimator.predict(next_state) 
-            td_target = reward + (0.0 if done else self.options.gamma * np.max(q_next))
+            target = reward + (0.0 if done else self.options.gamma * np.max(q_next))
 
-            self.estimator.update(state, action, td_target)
+            self.estimator.update(state, action, target)
 
             total_reward += reward
             steps += 1

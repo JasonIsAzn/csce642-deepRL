@@ -76,6 +76,12 @@ class Reinforce(AbstractSolver):
         ################################
         #   YOUR IMPLEMENTATION HERE   #
         ################################
+        returns = []
+        G = 0.0
+        for r in reversed(rewards):
+            G = r + gamma * G
+            returns.insert(0, G)
+        return returns
 
     def select_action(self, state):
         """
@@ -133,11 +139,26 @@ class Reinforce(AbstractSolver):
         action_probs = []  # Action probability
         baselines = []  # Value function
         for _ in range(self.options.steps):
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            # Run update_model() only ONCE #
-            # at the END of an episode.    #
-            ################################
+            action, prob, baseline = self.select_action(state)
+
+            step_res = self.step(action)
+            try:
+                next_state, reward, done, info = step_res
+            except ValueError:
+                next_state, reward, terminated, truncated, info = step_res
+                done = bool(terminated or truncated)
+
+            rewards.append(float(reward))
+            action_probs.append(prob)
+            baselines.append(baseline)
+
+            state = next_state
+
+            if done:
+                break
+
+        if len(rewards) > 0:
+            self.update_model(rewards, action_probs, baselines)
 
 
     def pg_loss(self, advantage, prob):
@@ -159,6 +180,9 @@ class Reinforce(AbstractSolver):
         ################################
         #   YOUR IMPLEMENTATION HERE   #
         ################################
+        eps = 1e-8
+        loss = -advantage * torch.log(prob + eps)
+        return loss
 
 
     def __str__(self):

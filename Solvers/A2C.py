@@ -124,12 +124,35 @@ class A2C(AbstractSolver):
 
         state, _ = self.env.reset()
         for _ in range(self.options.steps):
-            ################################
-            #   YOUR IMPLEMENTATION HERE   #
-            # Run update_actor_critic()    #
-            # only ONCE at EACH step in    #
-            # an episode.                  # 
-            ################################
+            # Select action using current policy
+            action, prob, value = self.select_action(state)
+            
+            # Take action in environment
+            next_state, reward, done, truncated, _ = self.step(action)
+            
+            # Convert next_state to tensor and get next value estimate
+            next_state_tensor = torch.as_tensor(next_state, dtype=torch.float32)
+            _, next_value = self.actor_critic(next_state_tensor)
+            
+            # Calculate TD target and advantage
+            # If episode is done, next_value should be 0
+            if done or truncated:
+                td_target = reward
+            else:
+                td_target = reward + self.options.gamma * next_value.detach()
+            
+            # Advantage = TD_target - V(s)
+            advantage = td_target - value
+            
+            # Perform actor-critic update
+            self.update_actor_critic(advantage, prob, value)
+            
+            # Move to next state
+            state = next_state
+            
+            # Reset if episode ended
+            if done or truncated:
+                state, _ = self.env.reset()
 
     def actor_loss(self, advantage, prob):
         """
@@ -147,9 +170,9 @@ class A2C(AbstractSolver):
         Returns:
             The unreduced loss (as a tensor).
         """
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################)
+        # Policy gradient loss: -log(π(a|s)) * A(s,a)
+        # We use negative because optimizers minimize loss
+        return -torch.log(prob) * advantage
 
     def critic_loss(self, advantage, value):
         """
@@ -162,9 +185,9 @@ class A2C(AbstractSolver):
         Returns:
             The unreduced loss (as a tensor).
         """
-        ################################
-        #   YOUR IMPLEMENTATION HERE   #
-        ################################
+        # Critic loss is the squared advantage (MSE of TD error)
+        # advantage = TD_target - V(s), so advantage^2 = (TD_target - V(s))^2
+        return 0.5 * advantage ** 2
 
     def __str__(self):
         return "A2C"

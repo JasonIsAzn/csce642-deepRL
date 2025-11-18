@@ -127,22 +127,22 @@ class A2C(AbstractSolver):
             # Select action using current policy
             action, prob, value = self.select_action(state)
             
-            # Take action in environment
-            next_state, reward, done, truncated, _ = self.step(action)
-            
-            # Convert next_state to tensor and get next value estimate
-            next_state_tensor = torch.as_tensor(next_state, dtype=torch.float32)
-            _, next_value = self.actor_critic(next_state_tensor)
+            # Take action in environment (returns 4 values, not 5)
+            next_state, reward, done, _ = self.step(action)
             
             # Calculate TD target and advantage
-            # If episode is done, next_value should be 0
-            if done or truncated:
+            if done:
+                # If episode is done, there is no next state value
                 td_target = reward
+                advantage = td_target - value
             else:
+                # Convert next_state to tensor and get next value estimate
+                next_state_tensor = torch.as_tensor(next_state, dtype=torch.float32)
+                _, next_value = self.actor_critic(next_state_tensor)
+                
+                # TD target = r + gamma * V(s')
                 td_target = reward + self.options.gamma * next_value.detach()
-            
-            # Advantage = TD_target - V(s)
-            advantage = td_target - value
+                advantage = td_target - value
             
             # Perform actor-critic update
             self.update_actor_critic(advantage, prob, value)
@@ -151,8 +151,9 @@ class A2C(AbstractSolver):
             state = next_state
             
             # Reset if episode ended
-            if done or truncated:
+            if done:
                 state, _ = self.env.reset()
+
 
     def actor_loss(self, advantage, prob):
         """
@@ -187,7 +188,7 @@ class A2C(AbstractSolver):
         """
         # Critic loss is the squared advantage (MSE of TD error)
         # advantage = TD_target - V(s), so advantage^2 = (TD_target - V(s))^2
-        return 0.5 * advantage ** 2
+        return advantage ** 2
 
     def __str__(self):
         return "A2C"
